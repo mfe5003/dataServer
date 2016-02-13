@@ -64,13 +64,16 @@ def showTable(table=None):
         return redirect(url_for('showTables'))
 
     cur = db.cursor()
-    query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 100""".format(table)
+    query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
-    num_fields = len(cur.description)
-    desc = dict([ (i[0], ("number", i[0])) for i in cur.description ])
-    field_names = [ i[0] for i in cur.description ]
+    field_names = []
+    for i in cur.description:
+        if i[0] != 'id':
+            field_names.append(i[0])
+
+    desc = dict([ (i, ("number", i)) for i in field_names ])
 
     cur.close()
     print desc
