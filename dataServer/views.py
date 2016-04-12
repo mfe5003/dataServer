@@ -1,7 +1,10 @@
 from dataServer import app
 from flask import render_template, g, jsonify
-import MySQLdb
+#import MySQLdb
+import mysql.connector as MySQLdb
 import gviz_api
+from datetime import datetime
+from dateutil import tz
 
 def connect_db():
     """Connect to the application database"""
@@ -64,7 +67,9 @@ def showTable(table=None):
         return redirect(url_for('showTables'))
 
     cur = db.cursor()
-    query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
+    #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
+    query = """SELECT measurementTime,c8,c9,c10,c11,c12,c13 FROM {0} ORDER BY
+    id DESC LIMIT 5000""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
@@ -74,6 +79,49 @@ def showTable(table=None):
             field_names.append(i[0])
 
     desc = dict([ (i, ("number", i)) for i in field_names ])
+
+    cur.close()
+    print desc
+    print field_names
+
+    data = [ dict( zip(field_names,r) ) for r in rows ]
+    data_table = gviz_api.DataTable(desc)
+    data_table.LoadData(data)
+    json = data_table.ToJSon(columns_order=tuple(field_names),order_by=field_names[0])
+    
+    #return json
+    return render_template('tableData.html', data=json)
+
+@app.route('/ntpCheck')
+def ntpCheck():
+    db = get_db()
+    table = tableNameFormatter("ntpTest3") # use simple name in url
+    if not checkDbTableExists(db, table):
+        return redirect(url_for('showTables'))
+
+    cur = db.cursor()
+    #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
+    query = """SELECT measurementTime,c0 FROM {0} ORDER BY
+    id DESC LIMIT 1000""".format(table)
+    cur.execute(query)
+    rows=cur.fetchall()
+
+    local_tz = tz.tzlocal()
+    rows = [ [datetime.fromtimestamp(r[0], local_tz), r[1]] for r in rows ]
+
+    field_names = []
+    for i in cur.description:
+        if i[0] != 'id':
+            field_names.append(i[0])
+
+#    desc = dict([ (i, ("number", i)) for i in field_names ])
+    desc_list = []
+    for i in field_names:
+        if i == "measurementTime":
+            desc_list.append( (i, ("datetime", i)) )
+        else:
+            desc_list.append( (i, ("number", i)) )
+    desc = dict(desc_list)
 
     cur.close()
     print desc
