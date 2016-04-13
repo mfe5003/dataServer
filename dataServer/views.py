@@ -38,6 +38,21 @@ def checkDbTableExists(dbcon, tablename):
     cur.close()
     return False
 
+def appendFracSec(dataMat, sCol, fsCol):
+    entries = len(dataMat)
+    fSecs = [ float(dataMat[idx][fsCol])/(2**32) for idx in xrange(entries) ]
+
+    dOut = []
+    for i in range(len(dataMat[0])):
+        if (i != sCol) and (i != fsCol):
+            dOut.append([ dataMat[idx][i] for idx in xrange(entries) ])
+        if i == sCol:
+            dOut.append([ datetime.fromtimestamp(dataMat[idx][i] + fSecs[idx]) for idx in xrange(entries) ])
+
+    # return transpose
+    return map(list, zip(*dOut))
+
+
 def tableNameFormatter(table):
     return 'measurements_'+table
 
@@ -68,21 +83,38 @@ def showTable(table=None):
 
     cur = db.cursor()
     #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
-    query = """SELECT measurementTime,c8,c9,c10,c11,c12,c13 FROM {0} ORDER BY
-    id DESC LIMIT 5000""".format(table)
+    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13 FROM {0} ORDER BY
+        id DESC LIMIT 1000""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
+    cnt = 0
+    SecCol = None
+    fracSecCol = None
     field_names = []
     for i in cur.description:
-        if i[0] != 'id':
+        if not (i[0] in ['id', 'fts']):
             field_names.append(i[0])
+        elif i[0] == 'fts':
+            fracSecCol = cnt
+        if i[0] == 'measurementTime':
+            SecCol = cnt
+        cnt += 1
+            
+    if ( SecCol != None ) and ( fracSecCol != None ):
+        rows = appendFracSec(map(list, rows), SecCol, fracSecCol)
 
-    desc = dict([ (i, ("number", i)) for i in field_names ])
+    # could be problem if fts is defined and measurementTime is not
+
+    desc_list = []
+    for i in field_names:
+        if i == "measurementTime":
+            desc_list.append( (i, ("datetime", i)) )
+        else:
+            desc_list.append( (i, ("number", i)) )
+    desc = dict(desc_list)
 
     cur.close()
-    print desc
-    print field_names
 
     data = [ dict( zip(field_names,r) ) for r in rows ]
     data_table = gviz_api.DataTable(desc)
@@ -90,7 +122,8 @@ def showTable(table=None):
     json = data_table.ToJSon(columns_order=tuple(field_names),order_by=field_names[0])
     
     #return json
-    return render_template('tableData.html', data=json)
+    #return render_template('tableData.html', data=json)
+    return render_template('tableDataDY.html', data=json)
 
 @app.route('/ntpCheck')
 def ntpCheck():

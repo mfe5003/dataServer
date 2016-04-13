@@ -1,0 +1,45 @@
+<html>
+  <head>
+    <!--Load the AJAX API-->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <!--<script type="text/javascript" src="dygraph-dev.js"></script> -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/1.1.1/dygraph-combined.js"></script>
+    <script type="text/javascript">
+
+      // Load the Visualization API and the corechart package.
+      google.charts.load('current', {'packages':['corechart']});
+
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.charts.setOnLoadCallback(drawChart);
+
+      // Callback that creates and populates a data table,
+      // instantiates the pie chart, passes in the data and
+      // draws it.
+      function drawChart() {
+
+        // Create the data table.
+        var data = new google.visualization.DataTable({{ data|tojson }});
+        var g = new Dygraph.GVizChart(document.getElementById('dy_chart_div'));
+        g.draw( data, { 
+          //rollPeriod: 1, 
+          legend: 'always',
+          title: 'MOT Laser Intensities',
+          ylabel: 'I_0 (mw/cm^2)',
+          xlabel: 'Time (HH:MM:SS)',
+          labelsDivStyles: {
+            'text-align': 'right',
+            'background': 'none'
+          },
+          strokeWidth: 1.5
+        });
+      }
+    </script>
+    <style media="screen" type="text/css">
+      #dy_chart_div { position: absolute; left: 200px; right: 50px; top: 100px; bottom: 50px; }
+    </style>
+  </head>
+
+  <body>
+    <div id="dy_chart_div" ></div>
+  </body>
+</html>
