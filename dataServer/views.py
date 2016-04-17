@@ -1,5 +1,5 @@
 from dataServer import app
-from flask import render_template, g, jsonify
+from flask import render_template, g, jsonify, request
 #import MySQLdb
 import mysql.connector as MySQLdb
 import gviz_api
@@ -38,13 +38,13 @@ def checkDbTableExists(dbcon, tablename):
     cur.close()
     return False
 
-def appendFracSec(dataMat, sCol, fsCol):
+def appendFracSec(dataMat, sCol, fsCol, idCol):
     entries = len(dataMat)
     fSecs = [ float(dataMat[idx][fsCol])/(2**32) for idx in xrange(entries) ]
 
     dOut = []
     for i in range(len(dataMat[0])):
-        if (i != sCol) and (i != fsCol):
+        if (i != sCol) and (i != fsCol) and ( i != idCol ):
             dOut.append([ dataMat[idx][i] for idx in xrange(entries) ])
         if i == sCol:
             dOut.append([ datetime.fromtimestamp(dataMat[idx][i] + fSecs[idx]) for idx in xrange(entries) ])
@@ -74,17 +74,17 @@ def showTables():
     rv = cur.fetchall()
     return str(rv)
 
-@app.route('/table/<table>/')
-def showTable(table=None):
+@app.route('/table/<tableName>/')
+def showTable(tableName=None):
     db = get_db()
-    table = tableNameFormatter(table) # use simple name in url
+    table = tableNameFormatter(tableName) # use simple name in url
     if not checkDbTableExists(db, table):
         return redirect(url_for('showTables'))
 
     cur = db.cursor()
     #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
-    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13 FROM {0} ORDER BY
-        id DESC LIMIT 1000""".format(table)
+    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13,id FROM {0} ORDER BY
+        id DESC LIMIT 5000""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
@@ -97,12 +97,20 @@ def showTable(table=None):
             field_names.append(i[0])
         elif i[0] == 'fts':
             fracSecCol = cnt
+        elif i[0] == 'id':
+            idCol = cnt
+            firstID = rows[-1][cnt]
+            lastID = rows[0][cnt]
+            if lastID < firstID:
+                temp = lastID
+                lastID = firstID
+                firstID = temp
         if i[0] == 'measurementTime':
             SecCol = cnt
         cnt += 1
             
     if ( SecCol != None ) and ( fracSecCol != None ):
-        rows = appendFracSec(map(list, rows), SecCol, fracSecCol)
+        rows = appendFracSec(map(list, rows), SecCol, fracSecCol, idCol)
 
     # could be problem if fts is defined and measurementTime is not
 
@@ -123,7 +131,71 @@ def showTable(table=None):
     
     #return json
     #return render_template('tableData.html', data=json)
-    return render_template('tableDataDY.html', data=json)
+    return render_template('tableDataDY.html', data=json, tableName=tableName,
+            idRange=[firstID, lastID])
+
+@app.route('/newData/<table>/')
+def getNewData(table=None):
+    lastID = request.args.get('lastID', -1, type=int)
+    if lastID < 0:
+        return ('', 204)
+
+    db = get_db()
+    table = tableNameFormatter(table) # use simple name in url
+    if not checkDbTableExists(db, table):
+        return ('', 204)
+
+    cur = db.cursor()
+    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13,id FROM {}
+    WHERE id > {} ORDER BY id DESC""".format(table, lastID)
+    print query
+    cur.execute(query)
+    rows=cur.fetchall()
+    print len(rows)
+
+    cnt = 0
+    SecCol = None
+    fracSecCol = None
+    field_names = []
+    for i in cur.description:
+        if not (i[0] in ['id', 'fts']):
+            field_names.append(i[0])
+        elif i[0] == 'fts':
+            firstID = rows[-1][cnt]
+            lastID = rows[0][cnt]
+            if lastID < firstID:
+                temp = lastID
+                lastID = firstID
+                firstID = temp
+            fracSecCol = cnt
+        elif i[0] == 'id':
+            idCol = cnt
+        if i[0] == 'measurementTime':
+            SecCol = cnt
+        cnt += 1
+            
+    if ( SecCol != None ) and ( fracSecCol != None ):
+        rows = appendFracSec(map(list, rows), SecCol, fracSecCol, idCol)
+
+    # could be problem if fts is defined and measurementTime is not
+
+    desc_list = []
+    for i in field_names:
+        if i == "measurementTime":
+            desc_list.append( (i, ("datetime", i)) )
+        else:
+            desc_list.append( (i, ("number", i)) )
+    desc = dict(desc_list)
+
+    cur.close()
+
+    data = [ dict( zip(field_names,r) ) for r in rows ]
+    data_table = gviz_api.DataTable(desc)
+    data_table.LoadData(data)
+    json = data_table.ToJSon(columns_order=tuple(field_names),order_by=field_names[0])
+
+    #print json
+    return json
 
 @app.route('/ntpCheck')
 def ntpCheck():

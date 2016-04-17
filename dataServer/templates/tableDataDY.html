@@ -1,6 +1,7 @@
 <html>
   <head>
     <!--Load the AJAX API-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <!--<script type="text/javascript" src="dygraph-dev.js"></script> -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/1.1.1/dygraph-combined.js"></script>
@@ -9,19 +10,19 @@
       // Load the Visualization API and the corechart package.
       google.charts.load('current', {'packages':['corechart']});
 
-      // Set a callback to run when the Google Visualization API is loaded.
-      google.charts.setOnLoadCallback(drawChart);
-
       // Callback that creates and populates a data table,
       // instantiates the pie chart, passes in the data and
       // draws it.
-      function drawChart() {
 
-        // Create the data table.
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
         var data = new google.visualization.DataTable({{ data|tojson }});
         var g = new Dygraph.GVizChart(document.getElementById('dy_chart_div'));
+        // Create the data table.
         g.draw( data, { 
-          //rollPeriod: 1, 
+          rollPeriod: 3, 
           legend: 'always',
           title: 'MOT Laser Intensities',
           ylabel: 'I_0 (mw/cm^2)',
@@ -32,7 +33,18 @@
           },
           strokeWidth: 1.5
         });
+        
       }
+
+//      window.intervalId = setInterval(function() {
+//        $.getJSON('/newData/{{ tableName }}', {
+//          lastID: {{ idRange[1] }},
+//        }, function(newData) {
+//          //window.alert(newData["rows"]);
+//          data["rows"].push(newData["rows"]);
+//          g.updateOptions( {"file": data} );
+//        });
+//      }, 2000)
     </script>
     <style media="screen" type="text/css">
       #dy_chart_div { position: absolute; left: 200px; right: 50px; top: 100px; bottom: 50px; }
@@ -41,5 +53,8 @@
 
   <body>
     <div id="dy_chart_div" ></div>
+    <span id="result">?</span>
+        <p><a href="javascript:void();" id="calculate">calculate
+          serverside</a></p>
   </body>
 </html>
