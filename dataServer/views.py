@@ -84,7 +84,7 @@ def showTable(tableName=None):
     cur = db.cursor()
     #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
     query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13,id FROM {0} ORDER BY
-        id DESC LIMIT 5000""".format(table)
+        id DESC LIMIT 1000""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
@@ -108,30 +108,17 @@ def showTable(tableName=None):
         if i[0] == 'measurementTime':
             SecCol = cnt
         cnt += 1
+    cur.close()
             
+    # could be problem if fts is defined and measurementTime is not
     if ( SecCol != None ) and ( fracSecCol != None ):
         rows = appendFracSec(map(list, rows), SecCol, fracSecCol, idCol)
 
-    # could be problem if fts is defined and measurementTime is not
-
-    desc_list = []
-    for i in field_names:
-        if i == "measurementTime":
-            desc_list.append( (i, ("datetime", i)) )
-        else:
-            desc_list.append( (i, ("number", i)) )
-    desc = dict(desc_list)
-
-    cur.close()
-
-    data = [ dict( zip(field_names,r) ) for r in rows ]
-    data_table = gviz_api.DataTable(desc)
-    data_table.LoadData(data)
-    json = data_table.ToJSon(columns_order=tuple(field_names),order_by=field_names[0])
+    data = [",".join(field_names)]
+    for r in rows:
+        data.append(",".join(map(str,r)))
     
-    #return json
-    #return render_template('tableData.html', data=json)
-    return render_template('tableDataDY.html', data=json, tableName=tableName,
+    return render_template('tableDataDY_csv.html', data="\n".join(data), tableName=tableName,
             idRange=[firstID, lastID])
 
 @app.route('/newData/<table>/')
@@ -157,45 +144,40 @@ def getNewData(table=None):
     SecCol = None
     fracSecCol = None
     field_names = []
-    for i in cur.description:
-        if not (i[0] in ['id', 'fts']):
-            field_names.append(i[0])
-        elif i[0] == 'fts':
-            firstID = rows[-1][cnt]
-            lastID = rows[0][cnt]
-            if lastID < firstID:
-                temp = lastID
-                lastID = firstID
-                firstID = temp
-            fracSecCol = cnt
-        elif i[0] == 'id':
-            idCol = cnt
-        if i[0] == 'measurementTime':
-            SecCol = cnt
-        cnt += 1
+    try:
+        for i in cur.description:
+            if not (i[0] in ['id', 'fts']):
+                field_names.append(i[0])
+            elif i[0] == 'fts':
+                fracSecCol = cnt
+            elif i[0] == 'id':
+                firstID = rows[-1][cnt]
+                lastID = rows[0][cnt]
+                if lastID < firstID:
+                    temp = lastID
+                    lastID = firstID
+                    firstID = temp
+                idCol = cnt
+            if i[0] == 'measurementTime':
+                SecCol = cnt
+            cnt += 1
+    except IndexError:
+        # there are no new entries
+        cur.close()
+        return ('', 204)
+
+    cur.close()
             
+    # could be problem if fts is defined and measurementTime is not
     if ( SecCol != None ) and ( fracSecCol != None ):
         rows = appendFracSec(map(list, rows), SecCol, fracSecCol, idCol)
 
-    # could be problem if fts is defined and measurementTime is not
-
-    desc_list = []
-    for i in field_names:
-        if i == "measurementTime":
-            desc_list.append( (i, ("datetime", i)) )
-        else:
-            desc_list.append( (i, ("number", i)) )
-    desc = dict(desc_list)
-
-    cur.close()
-
-    data = [ dict( zip(field_names,r) ) for r in rows ]
-    data_table = gviz_api.DataTable(desc)
-    data_table.LoadData(data)
-    json = data_table.ToJSon(columns_order=tuple(field_names),order_by=field_names[0])
-
-    #print json
-    return json
+    data = []
+    for r in rows:
+        data.append(",".join(map(str,r)))
+    
+    #print data
+    return jsonify(dataStr="\n".join(data), lastID=lastID)
 
 @app.route('/ntpCheck')
 def ntpCheck():

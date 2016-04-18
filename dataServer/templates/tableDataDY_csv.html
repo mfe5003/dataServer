@@ -1,0 +1,66 @@
+<html>
+  <head>
+    <!--Load the AJAX API-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <!--<script type="text/javascript" src="dygraph-dev.js"></script> -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/1.1.1/dygraph-combined.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function(){
+        var gdata = '{{ data | replace("\n", "\\n") }}';
+        var now = Date.now();
+        var then = now - 1000*60*10;
+        var g = new Dygraph(document.getElementById("div_g"), gdata, {
+          rollPeriod: 0, 
+          legend: 'always',
+          title: 'MOT Laser Intensities',
+          ylabel: 'P (mW)',
+          xlabel: 'Time (HH:MM:SS)',
+          strokeWidth: 2,
+          highlightCircleSize: 2,
+//        strokeBorderWidth: 1,
+//          highlightSeriesOpts:{
+//            strokeWidth: 3,
+//            strokeBorderWidth: 1,
+//            highlightCircleSize: 5,
+//          },
+          labelsDivStyles: {
+            'text-align': 'right',
+            'background': 'none'
+          },
+          dateWindow: [then, now],
+          //strokeWidth: 1.5,
+        });
+
+        var IDRange = {{ idRange }}
+        window.intervalId = setInterval(function() {
+          $.getJSON('/newData/{{ tableName }}', {
+            lastID: IDRange[1],
+          }, function(data) {
+            // update last ID so we only get new data
+            IDRange[1] = data["lastID"];  
+            // get the current time and shift window
+            now = Date.now();
+            then = now - 1000*60*10;
+            // append new data
+            //t = gdata.split('\n',1);
+            gdata = gdata + "\n" + data["dataStr"];
+            console.log([then, now]);
+            g.updateOptions( {"file": gdata, dateWindow: [then, now]} );
+          });
+        }, 500);
+      });
+
+    </script>
+    <style media="screen" type="text/css">
+      #div_g { position: absolute; left: 200px; right: 50px; top: 100px; bottom: 50px; }
+    </style>
+  </head>
+
+  <body>
+    <div id="div_g" ></div>
+    <span id="result">?</span>
+        <p><a href="javascript:void();" id="calculate">calculate
+          serverside</a></p>
+  </body>
+</html>
