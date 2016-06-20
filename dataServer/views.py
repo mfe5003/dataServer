@@ -1,5 +1,5 @@
 from dataServer import app
-from flask import render_template, g, jsonify, request
+from flask import render_template, g, jsonify, request, redirect, url_for
 #import MySQLdb
 import mysql.connector as MySQLdb
 import gviz_api
@@ -31,7 +31,7 @@ def checkDbTableExists(dbcon, tablename):
         WHERE table_name = %s
      """
     cur.execute(query, (tablename,))
-    if cur.fetchone()[0] == 1:
+    if cur.fetchone()[0] > 0:
         cur.close()
         return True
      
@@ -83,8 +83,8 @@ def showTable(tableName=None):
 
     cur = db.cursor()
     #query = """SELECT * FROM {0} ORDER BY id DESC LIMIT 600""".format(table)
-    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13,id FROM {0} ORDER BY
-        id DESC LIMIT 1000""".format(table)
+    query = """SELECT measurementTime,fts,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,id FROM {0} ORDER BY
+        id DESC LIMIT 20000""".format(table)
     cur.execute(query)
     rows=cur.fetchall()
 
@@ -133,12 +133,11 @@ def getNewData(table=None):
         return ('', 204)
 
     cur = db.cursor()
-    query = """SELECT measurementTime,fts,c8,c9,c10,c11,c12,c13,id FROM {}
+    query = """SELECT
+    measurementTime,fts,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,id FROM {}
     WHERE id > {} ORDER BY id DESC""".format(table, lastID)
-    print query
     cur.execute(query)
     rows=cur.fetchall()
-    print len(rows)
 
     cnt = 0
     SecCol = None
@@ -176,7 +175,6 @@ def getNewData(table=None):
     for r in rows:
         data.append(",".join(map(str,r)))
     
-    #print data
     return jsonify(dataStr="\n".join(data), lastID=lastID)
 
 @app.route('/ntpCheck')
@@ -211,8 +209,6 @@ def ntpCheck():
     desc = dict(desc_list)
 
     cur.close()
-    print desc
-    print field_names
 
     data = [ dict( zip(field_names,r) ) for r in rows ]
     data_table = gviz_api.DataTable(desc)
